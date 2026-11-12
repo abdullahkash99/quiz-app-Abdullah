@@ -39,12 +39,13 @@ const USER = page(`<div class=card id=s1><h1>🎯 المسابقة</h1><p>اكت
 <div class=card id=s2 hidden><p class=big id=msg></p></div><div id=s3 hidden></div>`, String.raw`
 var nm,qs=[],round,loaded=false,t;
 function show(i){['s1','s2','s3'].forEach(function(x){$(x).hidden=x!=i})}
-function go(){var v=$('nm').value.trim().replace(/\s+/g,' ');if(v.split(' ').length<3){$('er').textContent='الرجاء كتابة الاسم الثلاثي كاملاً';return}nm=v;poll();t=setInterval(poll,2000)}
-function poll(){fetch('/api/state').then(function(r){return r.json()}).then(function(s){
+function go(){var v=$('nm').value.trim().replace(/\s+/g,' ');if(v.split(' ').length<3){$('er').textContent='الرجاء كتابة الاسم الثلاثي كاملاً';return}nm=v;poll();clearInterval(t);t=setInterval(poll,2000)}
+function poll(){fetch('/api/state',{cache:'no-store'}).then(function(r){return r.json()}).then(function(s){
  if(localStorage.getItem('done')==String(s.round)){show('s2');$('msg').textContent='✅ تم استلام إجاباتك، شكراً لمشاركتك';clearInterval(t);return}
  if(s.status=='open'){if(!loaded){loaded=true;clearInterval(t);load()}}
- else{show('s2');$('msg').textContent=s.status=='idle'?'⏳ المسابقة لم تبدأ بعد، ابقَ في هذه الصفحة':'⛔ انتهت المسابقة'}}).catch(function(){})}
-function load(){fetch('/api/questions').then(function(r){return r.json()}).then(function(d){
+ else{show('s2');$('msg').textContent=s.status=='idle'?'⏳ المسابقة لم تبدأ بعد، ابقَ في هذه الصفحة':'⛔ انتهت المسابقة'}}).catch(function(){if(nm){show('s2');$('msg').textContent='📶 جارٍ الاتصال... تأكد من الإنترنت'}})}
+document.addEventListener('visibilitychange',function(){if(nm&&!loaded)poll()});window.addEventListener('online',function(){if(nm&&!loaded)poll()});
+function load(){fetch('/api/questions',{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){
  if(d.error){loaded=false;t=setInterval(poll,2000);return}
  qs=d.qs;round=d.round;var h='<h2>'+esc(nm)+'</h2>';
  qs.forEach(function(q,i){h+='<div class=card><b>'+(i+1)+'. '+esc(q.q)+'</b>';q.o.forEach(function(o,j){h+='<label><input type=radio name=q'+i+' value='+j+'> '+esc(o)+'</label>'});h+='</div>'});
@@ -66,7 +67,7 @@ function render(s){ST=s;if(busy)return;
  set('<h1>🎯 امسح الرمز للمشاركة</h1><div id=qr></div><p class=big>'+(s.status=='open'?'المسابقة جارية — المشاركون: '+s.total:'ستبدأ المسابقة قريباً')+'</p>')}
 function spin(d){busy=true;last='';$('main').innerHTML='<h1>🎲 جارٍ السحب...</h1><div class=win id=sp></div>';var t0=Date.now(),p=d.pool;
  (function tick(){var e=Date.now()-t0;if(e>6000){busy=false;last='';render(ST);return}$('sp').textContent=p[Math.floor(Math.random()*p.length)];setTimeout(tick,60+e/25)})()}
-function poll(){fetch('/api/state').then(function(r){return r.json()}).then(render).catch(function(){})}
+function poll(){fetch('/api/state',{cache:'no-store'}).then(function(r){return r.json()}).then(render).catch(function(){})}
 poll();setInterval(poll,1500);
 `, true);
 
@@ -100,8 +101,8 @@ http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x'), p = u.pathname; let b = '';
   req.on('data', c => { b += c; if (b.length > 1e6) req.destroy(); });
   req.on('end', () => {
-    const J = (o, c = 200) => { res.writeHead(c, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(o)); };
-    const H = h => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(h); };
+    const J = (o, c = 200) => { res.writeHead(c, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(o)); };
+    const H = h => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(h); };
     let d = {}; try { d = JSON.parse(b || '{}'); } catch (e) {}
     const adm = u.searchParams.get('key') === KEY;
     if (p === '/') return H(USER);
