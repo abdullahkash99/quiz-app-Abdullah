@@ -17,10 +17,21 @@ const save = () => fs.writeFileSync(FILE, JSON.stringify(S));
 const parseQ = t => t.split('\n').map(l => l.split('|').map(x => x.trim())).filter(a => a.length >= 4 && a[0])
   .map(a => ({ q: a[0], o: a.slice(1, -1), c: (+a[a.length - 1]) - 1 })).filter(q => q.c >= 0 && q.c < q.o.length);
 if (!S.questions.length) S.questions = parseQ(S.qtext);
+const sha = x => crypto.createHash('sha256').update(String(x)).digest();
+const eq = (a, b) => crypto.timingSafeEqual(sha(a), sha(b));
+const SESS = sha(KEY + '|sess').toString('hex');
+let fails = [], lockUntil = 0;
+const keyOk = k => { if (Date.now() < lockUntil) return false; const ok = eq(k, KEY);
+  if (!ok) { fails = fails.filter(t => Date.now() - t < 600000); fails.push(Date.now()); if (fails.length >= 10) { lockUntil = Date.now() + 300000; fails = []; } } return ok; };
+const cookie = (req, n) => ((req.headers.cookie || '').split(';').map(c => c.trim().split('=')).find(p => p[0] === n) || [])[1];
+const SEC = { 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer', 'Cache-Control': 'no-store',
+  'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'" };
+const cs = v => { v = String(v); if (/^[=+\-@\t\r]/.test(v)) v = "'" + v; return '"' + v.replace(/"/g, '""') + '"'; };
 const norm = n => n.trim().replace(/\s+/g, ' ').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').toLowerCase();
 const tickS = () => { if (S.status === 'open' && S.endsAt && Date.now() >= S.endsAt) { S.status = 'stopped'; S.stoppedAt = S.endsAt; save(); } };
 const qualified = () => S.subs.filter(s => s.score / s.total >= PASS);
 
+const TITLE = 'مسابقة حفل تقاعد محمد صائغ';
 const CSS = `*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;margin:0;background:#0f172a;color:#f1f5f9;padding:16px;direction:rtl}
 .card{background:#1e293b;border-radius:14px;padding:16px;margin:12px auto;max-width:640px}h1,h2{text-align:center}
 input[type=text],textarea{width:100%;padding:12px;border-radius:10px;border:1px solid #475569;background:#0f172a;color:#fff;font-size:16px}
@@ -34,9 +45,9 @@ button.r{background:#dc2626}button.g{background:#16a34a}button.o{background:#d97
 const QRJS = '<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>';
 const COMMON = String.raw`function $(i){return document.getElementById(i)}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}`;
-const page = (body, js, qr) => `<!doctype html><html lang=ar dir=rtl><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>المسابقة</title><style>${CSS}</style>${qr ? QRJS : ''}<body>${body}<script>${COMMON}\n${js}</script></body></html>`;
+const page = (body, js, qr) => `<!doctype html><html lang=ar dir=rtl><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>${TITLE}</title><style>${CSS}</style>${qr ? QRJS : ''}<body>${body}<script>${COMMON}\n${js}</script></body></html>`;
 
-const USER = page(`<div class=card id=s1><h1>🎯 المسابقة</h1><p>اكتب اسمك الثلاثي</p><input type=text id=nm placeholder="الاسم الثلاثي"><button onclick=go()>دخول</button><p id=er class=er></p></div>
+const USER = page(`<div class=card id=s1><h1>🎉 ${TITLE}</h1><p>اكتب اسمك الثلاثي</p><input type=text id=nm placeholder="الاسم الثلاثي"><button onclick=go()>دخول</button><p id=er class=er></p></div>
 <div class=card id=s2 hidden><p class=big id=msg></p></div><div id=s3 hidden></div>`, String.raw`
 var nm,qs=[],round,loaded=false,t,endsAt=0,off=0;
 function fmt(r){var m=Math.floor(r/60),x=r%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x}
@@ -67,7 +78,7 @@ function render(s){ST=s;if(busy)return;
  if(s.draw){set('<h1>🏆 الفائز</h1><div class=win>'+esc(s.draw.winner)+'</div>'+wl(s));return}
  if(s.showList){var h='<h1>المتأهلون (80% فأعلى) — '+s.qualified.length+'</h1><div class=grid>';s.qualified.forEach(function(n){h+='<div class=chip>'+esc(n)+'</div>'});set(h+'</div>');return}
  if(s.status=='stopped'){set('<h1>⛔ انتهت المسابقة</h1><p class=big>عدد المشاركين: '+s.total+'</p>');return}
- set('<h1>🎯 امسح الرمز للمشاركة</h1><div id=qr></div><div class=win id=tm style="font-size:80px;margin:10px"></div><p class=big>'+(s.status=='open'?'المسابقة جارية — المشاركون: '+s.total:'ستبدأ المسابقة قريباً')+'</p>')}
+ set('<h1>🎉 ${TITLE}</h1><h2>امسح الرمز للمشاركة</h2><div id=qr></div><div class=win id=tm style="font-size:80px;margin:10px"></div><p class=big>'+(s.status=='open'?'المسابقة جارية — المشاركون: '+s.total:'ستبدأ المسابقة قريباً')+'</p>')}
 function spin(d){busy=true;last='';$('main').innerHTML='<h1>🎲 جارٍ السحب...</h1><div class=win id=sp></div>';var t0=Date.now(),p=d.pool;
  (function tick(){var e=Date.now()-t0;if(e>6000){busy=false;last='';render(ST);return}$('sp').textContent=p[Math.floor(Math.random()*p.length)];setTimeout(tick,60+e/25)})()}
 function poll(){fetch('/api/state',{cache:'no-store'}).then(function(r){return r.json()})
@@ -79,19 +90,22 @@ setInterval(function(){var e=$('tm');if(!e||!ST)return;
 poll();setInterval(poll,1500);
 `, true);
 
+const LOGIN = page(`<div class=card><h1>🔐 دخول الأدمن</h1><input type=password id=k placeholder="كلمة السر" style="width:100%;padding:12px;border-radius:10px;border:1px solid var(--mu);font-size:16px" onkeydown="if(event.key=='Enter')go()"><button onclick=go()>دخول</button><p id=er class=er></p></div>`, String.raw`
+function go(){fetch('/api/login',{method:'POST',body:JSON.stringify({key:$('k').value})}).then(function(r){return r.json()}).then(function(d){if(d.ok)location='/admin';else $('er').textContent=d.error})}`);
 const ADMIN = page(`<div id=ov><div style="position:fixed;top:10px;right:10px;left:10px;display:flex;justify-content:space-between"><button onclick="drawNow()">🎲 سحب فائز آخر</button><button class=r onclick="closeOv()">✖ إغلاق</button></div><div id=ovc style="padding-top:70px"></div></div>
-<h1>لوحة التحكم</h1>
+<h1>لوحة التحكم — ${TITLE}</h1><p id=wk class=er></p>
 <div class=card><p>الحالة: <b id=st></b> | المشاركون: <b id=tot></b> | المتأهلون (80%+): <b id=qc></b></p>
 المدة بالدقائق: <input type=text id=mins value=10 style="width:70px;display:inline-block"> <button class=g onclick="act('start',{minutes:+$('mins').value||10})">▶ بدء المسابقة</button><button class=r onclick="act('stop')">⏹ إيقاف المسابقة</button>
 <button class=o onclick="act('list')">📋 عرض/إخفاء قائمة المتأهلين</button><button onclick="drawNow()">🎲 سحب فائز</button>
 <button onclick="act('hide')">🖥 إخفاء الفائز</button><button class=o id=nr onclick="act('norepeat')"></button><button class=r onclick="resetAll()">♻ تصفير</button>
 <p id=msg class=er></p><p>📺 <a style="color:#93c5fd" id=sl target=_blank>افتح شاشة العرض</a> | <a style="color:#93c5fd" id=ex>تصدير CSV</a></p></div>
+<div class=card><b>🧪 اختبار النظام:</b> عدد المشاركين التجريبيين <input type=text id=cnt value=20 style="width:70px;display:inline-block"> <button class=o onclick="act('seed',{count:+$('cnt').value||20})">إضافة مشاركين تجريبيين</button><button class=r onclick="act('clearfake')">🧹 حذف التجريبيين</button></div>
 <div class=card><b>رابط المشاركة:</b> <span id=lk></span><div id=qr></div></div>
 <div class=card><b>الأسئلة</b> (سطر لكل سؤال: السؤال | خيار | خيار | خيار | رقم الإجابة الصحيحة)
 <textarea id=qt></textarea><button onclick=saveQ()>💾 حفظ الأسئلة</button></div>
 <div class=card><b>ما يظهر الآن على شاشة العرض:</b> <span id=sc></span><div id=ql style="margin-top:8px"></div></div>
 <div class=card><b>النتائج</b><table id=tb></table></div>`, String.raw`
-var K=new URLSearchParams(location.search).get('key')||'',first=true;
+var K='',first=true;
 $('lk').textContent=location.origin+'/';$('sl').href='/screen';$('ex').href='/api/admin/csv?key='+encodeURIComponent(K);
 new QRCode($('qr'),{text:location.origin+'/',width:200,height:200});
 function act(a,b){fetch('/api/admin/'+a+'?key='+encodeURIComponent(K),{method:'POST',body:JSON.stringify(b||{})}).then(function(r){return r.json()}).then(function(d){$('msg').textContent=d.error||'✔ تم';if(d.draw)spinAdmin(d.draw);poll()})}
@@ -99,13 +113,13 @@ var armed=false;
 function resetAll(){if(!armed){armed=true;$('msg').textContent='⚠️ اضغط تصفير مرة ثانية خلال 5 ثواني للتأكيد';setTimeout(function(){armed=false},5000);return}armed=false;fetch('/api/admin/reset?key='+encodeURIComponent(K),{method:'POST',body:'{}'}).then(function(r){return r.json()}).then(function(d){$('msg').textContent=d.error||'✅ تم التصفير';poll()}).catch(function(){$('msg').textContent='تعذر الاتصال بالسيرفر'})}
 function saveQ(){act('questions',{text:$('qt').value})}
 function poll(){fetch('/api/admin/state?key='+encodeURIComponent(K)).then(function(r){return r.json()}).then(function(s){
- if(s.error){document.body.innerHTML='<h1>مفتاح الإدارة غير صحيح</h1>';return}
+ if(s.error){location='/admin';return}
  $('st').textContent={idle:'لم تبدأ',open:'جارية',stopped:'متوقفة'}[s.status];$('tot').textContent=s.subs.length;
  var q=s.subs.filter(function(x){return x.score/x.total>=0.8});$('qc').textContent=q.length;
  if(first){first=false;$('qt').value=s.qtext}
  var h='<tr><th>الاسم</th><th>الدرجة</th><th>النسبة</th></tr>';
- s.subs.slice().sort(function(a,b){return b.score-a.score}).forEach(function(x){var p=Math.round(100*x.score/x.total);h+='<tr><td>'+esc(x.name)+(s.winners.indexOf(x.name)>=0?' 🏆':'')+'</td><td>'+x.score+'/'+x.total+'</td><td class='+(p>=80?'ok':'')+'>'+p+'%</td></tr>'});
- $('tb').innerHTML=h;$('nr').textContent=s.noRepeat?'🔒 منع تكرار الفائز: مفعّل':'🔓 منع تكرار الفائز: معطّل';$('sc').textContent=s.draw?('🏆 الفائز: '+s.draw.winner):(s.showList?'📋 قائمة المتأهلين':'— لا شيء —');$('ql').innerHTML='<small>المتأهلون الآن ('+s.qual.length+'):</small> '+(s.qual.length?s.qual.map(esc).join(' • '):'لا أحد حتى الآن (يلزم 80% فأعلى)');ovUpdate(s)})}
+ s.subs.slice().sort(function(a,b){return b.score-a.score}).forEach(function(x){var p=Math.round(100*x.score/x.total);h+='<tr><td>'+esc(x.name)+(x.fake?' 🧪':'')+(s.winners.indexOf(x.name)>=0?' 🏆':'')+'</td><td>'+x.score+'/'+x.total+'</td><td class='+(p>=80?'ok':'')+'>'+p+'%</td></tr>'});
+ $('tb').innerHTML=h;$('wk').textContent=s.weak?'⚠️ كلمة سر الأدمن ضعيفة: غيّر ADMIN_KEY في Render إلى 10 أحرف أو أكثر':'';$('nr').textContent=s.noRepeat?'🔒 منع تكرار الفائز: مفعّل':'🔓 منع تكرار الفائز: معطّل';$('sc').textContent=s.draw?('🏆 الفائز: '+s.draw.winner):(s.showList?'📋 قائمة المتأهلين':'— لا شيء —');$('ql').innerHTML='<small>المتأهلون الآن ('+s.qual.length+'):</small> '+(s.qual.length?s.qual.map(esc).join(' • '):'لا أحد حتى الآن (يلزم 80% فأعلى)');ovUpdate(s)})}
 var spinning=false,spinEnd=0,QL=[],ovLock=false;
 function closeOv(){spinning=false;ovLock=false;$('ov').style.display='none';fetch('/api/admin/hide?key='+encodeURIComponent(K),{method:'POST',body:'{}'}).then(poll)}
 function ovUpdate(s){QL=s.qual||[];if(spinning||ovLock||Date.now()-spinEnd<2500)return;var o=$('ov'),c=$('ovc');
@@ -129,16 +143,26 @@ poll();setInterval(poll,2500);
 
 http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x'), p = u.pathname; let b = '';
-  req.on('data', c => { b += c; if (b.length > 1e6) req.destroy(); });
+  req.on('data', c => { b += c; if (b.length > 1e5) req.destroy(); });
   req.on('end', () => {
     tickS();
-    const J = (o, c = 200) => { res.writeHead(c, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(o)); };
-    const H = h => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(h); };
+    const J = (o, c = 200) => { res.writeHead(c, { 'Content-Type': 'application/json; charset=utf-8', ...SEC }); res.end(JSON.stringify(o)); };
+    const H = h => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', ...SEC }); res.end(h); };
     let d = {}; try { d = JSON.parse(b || '{}'); } catch (e) {}
-    const adm = u.searchParams.get('key') === KEY;
+    const qk = u.searchParams.get('key'), ck = cookie(req, 'adm');
+    const adm = !!((ck && eq(ck, SESS)) || (qk && keyOk(qk)));
+    const sess = () => 'adm=' + SESS + '; HttpOnly; SameSite=Strict; Path=/; Max-Age=43200' + (req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : '');
     if (p === '/') return H(USER);
     if (p === '/screen') return H(SCREEN);
-    if (p === '/admin') return H(ADMIN);
+    if (p === '/admin') {
+      if (adm && qk) { res.writeHead(302, { Location: '/admin', 'Set-Cookie': sess(), ...SEC }); return res.end(); }
+      return H(adm ? ADMIN : LOGIN);
+    }
+    if (p === '/api/login' && req.method === 'POST') {
+      if (Date.now() < lockUntil) return J({ error: 'محاولات كثيرة، انتظر 5 دقائق' }, 429);
+      if (typeof d.key === 'string' && keyOk(d.key)) { res.setHeader('Set-Cookie', sess()); return J({ ok: true }); }
+      return J({ error: 'كلمة السر غير صحيحة' }, 403);
+    }
     if (p === '/api/state') return J({ now: Date.now(), minutes: S.minutes, endsAt: S.endsAt, status: S.status, round: S.round, total: S.subs.length, draw: S.draw, winners: S.winners,
       showList: S.showList, qualified: S.showList ? qualified().map(s => s.name) : [] });
     if (p === '/api/questions') return S.status !== 'open' ? J({ error: 'closed' })
@@ -147,22 +171,40 @@ http.createServer((req, res) => {
       if (S.status !== 'open') return J({ error: 'المسابقة غير مفتوحة' });
       const name = String(d.name || '').trim().replace(/\s+/g, ' ');
       if (name.split(' ').length < 3) return J({ error: 'الرجاء كتابة الاسم الثلاثي' });
+      if (name.length > 60) return J({ error: 'الاسم طويل جداً' });
+      if (S.subs.length >= 3000) return J({ error: 'اكتمل العدد' });
+      let did = cookie(req, 'did') || crypto.randomBytes(12).toString('hex');
+      res.setHeader('Set-Cookie', 'did=' + did + '; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400');
+      if (S.subs.some(x => x.did === did)) return J({ error: 'تم الإرسال من هذا الجهاز مسبقاً' });
       if (!Array.isArray(d.answers) || d.answers.length !== S.questions.length) return J({ error: 'إجابات غير مكتملة' });
+      if (d.answers.some((x, i) => !Number.isInteger(x) || x < 0 || x >= S.questions[i].o.length)) return J({ error: 'إجابات غير صالحة' });
       if (S.subs.some(s => norm(s.name) === norm(name))) return J({ error: 'هذا الاسم شارك مسبقاً' });
       const score = S.questions.filter((q, i) => d.answers[i] === q.c).length;
-      S.subs.push({ name, score, total: S.questions.length, at: Date.now() }); save();
+      S.subs.push({ name, score, total: S.questions.length, at: Date.now(), did }); save();
       return J({ ok: true });
     }
     if (p.startsWith('/api/admin/')) {
       if (!adm) return J({ error: 'forbidden' }, 403);
       const a = p.slice(11);
-      if (a === 'state') return J({ status: S.status, qtext: S.qtext, subs: S.subs, winners: S.winners, qual: qualified().map(s => s.name), draw: S.draw, showList: S.showList, noRepeat: S.noRepeat });
-      if (a === 'csv') { res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename=results.csv' });
-        return res.end('\ufeffالاسم,الدرجة,من,النسبة\n' + S.subs.map(s => [s.name, s.score, s.total, Math.round(100 * s.score / s.total) + '%'].join(',')).join('\n')); }
+      if (a === 'state') return J({ status: S.status, qtext: S.qtext, subs: S.subs, winners: S.winners, qual: qualified().map(s => s.name), draw: S.draw, showList: S.showList, noRepeat: S.noRepeat, weak: KEY.length < 10 });
+      if (a === 'csv') { res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename=results.csv', ...SEC });
+        return res.end('\ufeffالاسم,الدرجة,من,النسبة\n' + S.subs.map(s => [s.name, s.score, s.total, Math.round(100 * s.score / s.total) + '%'].map(cs).join(',')).join('\n')); }
       if (a === 'start') { if (!S.questions.length) return J({ error: 'لا توجد أسئلة' }); S.minutes = Math.min(180, Math.max(1, +d.minutes || 10)); S.endsAt = Date.now() + S.minutes * 60000; S.status = 'open'; S.draw = null; S.showList = false; }
       else if (a === 'stop') S.status = 'stopped';
       else if (a === 'list') S.showList = !S.showList, S.draw = null;
       else if (a === 'hide') S.draw = null, S.showList = false;
+      else if (a === 'seed') {
+        const R = n => Math.floor(Math.random() * n), P = arr => arr[R(arr.length)], T = S.questions.length, th = Math.ceil(T * PASS);
+        const F = ['محمد','أحمد','خالد','عبدالله','سعد','فهد','سلطان','نواف','ماجد','يوسف','تركي','بندر','ناصر','عمر','فيصل','راشد'], L = ['العتيبي','الغامدي','القحطاني','الدوسري','الشمري','الحربي','الزهراني','المطيري','السبيعي','العنزي','الشهري','البلوي'];
+        const n = Math.min(100, Math.max(1, +d.count || 20));
+        for (let i = 0; i < n; i++) {
+          const name = P(F) + ' ' + P(F) + ' ' + P(L);
+          if (S.subs.some(x => norm(x.name) === norm(name))) continue;
+          const score = Math.random() < 0.4 ? th + R(T - th + 1) : R(th);
+          S.subs.push({ name, score, total: T, at: Date.now(), fake: true });
+        }
+      }
+      else if (a === 'clearfake') { S.subs = S.subs.filter(x => !x.fake); S.winners = []; S.draw = null; S.showList = false; }
       else if (a === 'norepeat') S.noRepeat = !S.noRepeat;
       else if (a === 'resetwinners') S.winners = [], S.draw = null;
       else if (a === 'reset') Object.assign(S, { round: Date.now(), subs: [], winners: [], draw: null, showList: false, status: 'idle', endsAt: 0 });
@@ -180,4 +222,4 @@ http.createServer((req, res) => {
     }
     res.writeHead(404); res.end('not found');
   });
-}).listen(PORT, () => console.log('Running on http://localhost:' + PORT + '  | admin: /admin?key=' + KEY));
+}).listen(PORT, () => console.log('Running on http://localhost:' + PORT + '  | admin: /admin'));
