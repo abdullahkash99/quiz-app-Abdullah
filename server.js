@@ -31,7 +31,7 @@ const norm = n => n.trim().replace(/\s+/g, ' ').replace(/[أإآ]/g, 'ا').repla
 const tickS = () => { if (S.status === 'open' && S.endsAt && Date.now() >= S.endsAt) { S.status = 'stopped'; S.stoppedAt = S.endsAt; save(); } };
 const qualified = () => S.subs.filter(s => s.score / s.total >= PASS);
 
-const TITLE = 'مسابقة حفل تقاعد محمد صائغ';
+const TITLE = 'مسابقة حفل تقاعد الأستاذ محمد صائغ';
 const CSS = `*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;margin:0;background:#0f172a;color:#f1f5f9;padding:16px;direction:rtl}
 .card{background:#1e293b;border-radius:14px;padding:16px;margin:12px auto;max-width:640px}h1,h2{text-align:center}
 input[type=text],textarea{width:100%;padding:12px;border-radius:10px;border:1px solid #475569;background:#0f172a;color:#fff;font-size:16px}
@@ -55,8 +55,7 @@ setInterval(function(){var e=$('tm');if(e&&endsAt){var r=Math.max(0,Math.ceil((e
 function show(i){['s1','s2','s3'].forEach(function(x){$(x).hidden=x!=i})}
 function go(){var v=$('nm').value.trim().replace(/\s+/g,' ');if(v.split(' ').length<3){$('er').textContent='الرجاء كتابة الاسم الثلاثي كاملاً';return}nm=v;poll();clearInterval(t);t=setInterval(poll,2000)}
 function poll(){fetch('/api/state',{cache:'no-store'}).then(function(r){return r.json()}).then(function(s){
- if(localStorage.getItem('done')==String(s.round)){show('s2');$('msg').textContent='✅ تم استلام إجاباتك، شكراً لمشاركتك';clearInterval(t);return}
- if(s.status=='open'){if(!loaded){loaded=true;clearInterval(t);load()}}
+  if(s.status=='open'){if(!loaded){loaded=true;clearInterval(t);load()}}
  else{show('s2');$('msg').textContent=s.status=='idle'?'⏳ المسابقة لم تبدأ بعد، ابقَ في هذه الصفحة':'⛔ انتهت المسابقة'}}).catch(function(){if(nm){show('s2');$('msg').textContent='📶 جارٍ الاتصال... تأكد من الإنترنت'}})}
 document.addEventListener('visibilitychange',function(){if(nm&&!loaded)poll()});window.addEventListener('online',function(){if(nm&&!loaded)poll()});
 function load(){fetch('/api/questions',{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){
@@ -64,9 +63,10 @@ function load(){fetch('/api/questions',{cache:'no-store'}).then(function(r){retu
  qs=d.qs;round=d.round;endsAt=d.endsAt;off=d.now-Date.now();var h='<div id=tm class=card style="text-align:center;font-size:24px;position:sticky;top:0;z-index:2"></div><h2>'+esc(nm)+'</h2>';
  qs.forEach(function(q,i){h+='<div class=card><b>'+(i+1)+'. '+esc(q.q)+'</b>';q.o.forEach(function(o,j){h+='<label><input type=radio name=q'+i+' value='+j+'> '+esc(o)+'</label>'});h+='</div>'});
  h+='<div class=card><button onclick=send()>إرسال الإجابات</button><p id=er2 class=er></p></div>';$('s3').innerHTML=h;show('s3')})}
+function again(){nm='';loaded=false;clearInterval(t);$('nm').value='';$('er').textContent='';show('s1')}
 function send(){var a=[];for(var i=0;i<qs.length;i++){var c=document.querySelector('input[name=q'+i+']:checked');if(!c){$('er2').textContent='أجب على جميع الأسئلة';return}a.push(+c.value)}
  fetch('/api/submit',{method:'POST',body:JSON.stringify({name:nm,answers:a})}).then(function(r){return r.json()}).then(function(d){
-  if(d.ok){localStorage.setItem('done',String(round));show('s2');$('msg').textContent='✅ تم استلام إجاباتك، شكراً لمشاركتك'}else $('er2').textContent=d.error})}
+  if(d.ok){show('s2');$('msg').innerHTML='✅ تم استلام إجاباتك، شكراً لمشاركتك<br><br><button onclick="again()">➕ مشاركة جديدة باسم آخر</button>'}else if(d.error.indexOf('الاسم')>=0){nm='';loaded=false;clearInterval(t);show('s1');$('er').textContent=d.error}else $('er2').textContent=d.error})}
 `);
 
 const SCREEN = page('<div id=main></div>', String.raw`
@@ -173,14 +173,11 @@ http.createServer((req, res) => {
       if (name.split(' ').length < 3) return J({ error: 'الرجاء كتابة الاسم الثلاثي' });
       if (name.length > 60) return J({ error: 'الاسم طويل جداً' });
       if (S.subs.length >= 3000) return J({ error: 'اكتمل العدد' });
-      let did = cookie(req, 'did') || crypto.randomBytes(12).toString('hex');
-      res.setHeader('Set-Cookie', 'did=' + did + '; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400');
-      if (S.subs.some(x => x.did === did)) return J({ error: 'تم الإرسال من هذا الجهاز مسبقاً' });
       if (!Array.isArray(d.answers) || d.answers.length !== S.questions.length) return J({ error: 'إجابات غير مكتملة' });
       if (d.answers.some((x, i) => !Number.isInteger(x) || x < 0 || x >= S.questions[i].o.length)) return J({ error: 'إجابات غير صالحة' });
       if (S.subs.some(s => norm(s.name) === norm(name))) return J({ error: 'هذا الاسم شارك مسبقاً' });
       const score = S.questions.filter((q, i) => d.answers[i] === q.c).length;
-      S.subs.push({ name, score, total: S.questions.length, at: Date.now(), did }); save();
+      S.subs.push({ name, score, total: S.questions.length, at: Date.now() }); save();
       return J({ ok: true });
     }
     if (p.startsWith('/api/admin/')) {
