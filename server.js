@@ -63,10 +63,9 @@ function load(){fetch('/api/questions',{cache:'no-store'}).then(function(r){retu
  qs=d.qs;round=d.round;endsAt=d.endsAt;off=d.now-Date.now();var h='<div id=tm class=card style="text-align:center;font-size:24px;position:sticky;top:0;z-index:2"></div><h2>'+esc(nm)+'</h2>';
  qs.forEach(function(q,i){h+='<div class=card><b>'+(i+1)+'. '+esc(q.q)+'</b>';q.o.forEach(function(o,j){h+='<label><input type=radio name=q'+i+' value='+j+'> '+esc(o)+'</label>'});h+='</div>'});
  h+='<div class=card><button onclick=send()>إرسال الإجابات</button><p id=er2 class=er></p></div>';$('s3').innerHTML=h;show('s3')})}
-function again(){nm='';loaded=false;clearInterval(t);$('nm').value='';$('er').textContent='';show('s1')}
 function send(){var a=[];for(var i=0;i<qs.length;i++){var c=document.querySelector('input[name=q'+i+']:checked');if(!c){$('er2').textContent='أجب على جميع الأسئلة';return}a.push(+c.value)}
  fetch('/api/submit',{method:'POST',body:JSON.stringify({name:nm,answers:a})}).then(function(r){return r.json()}).then(function(d){
-  if(d.ok){show('s2');$('msg').innerHTML='✅ تم استلام إجاباتك، شكراً لمشاركتك<br><br><button onclick="again()">➕ مشاركة جديدة باسم آخر</button>'}else if(d.error.indexOf('الاسم')>=0){nm='';loaded=false;clearInterval(t);show('s1');$('er').textContent=d.error}else $('er2').textContent=d.error})}
+  if(d.ok){show('s2');$('msg').textContent='✅ تم استلام إجاباتك، شكراً لمشاركتك'}else if(d.error.indexOf('الاسم')>=0){nm='';loaded=false;clearInterval(t);show('s1');$('er').textContent=d.error}else $('er2').textContent=d.error})}
 `);
 
 const SCREEN = page('<div id=main></div>', String.raw`
