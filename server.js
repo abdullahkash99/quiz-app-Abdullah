@@ -75,7 +75,7 @@ const ADMIN = page(`<h1>لوحة التحكم</h1>
 <div class=card><p>الحالة: <b id=st></b> | المشاركون: <b id=tot></b> | المتأهلون (80%+): <b id=qc></b></p>
 <button class=g onclick="act('start')">▶ بدء المسابقة</button><button class=r onclick="act('stop')">⏹ إيقاف المسابقة</button>
 <button class=o onclick="act('list')">📋 عرض/إخفاء قائمة المتأهلين</button><button onclick="act('draw')">🎲 سحب فائز</button>
-<button onclick="act('hide')">🖥 إخفاء الفائز</button><button class=r onclick="if(confirm('تصفير كل النتائج؟'))act('reset')">♻ تصفير</button>
+<button onclick="act('hide')">🖥 إخفاء الفائز</button><button class=r onclick="resetAll()">♻ تصفير</button>
 <p id=msg class=er></p><p>📺 <a style="color:#93c5fd" id=sl target=_blank>افتح شاشة العرض</a> | <a style="color:#93c5fd" id=ex>تصدير CSV</a></p></div>
 <div class=card><b>رابط المشاركة:</b> <span id=lk></span><div id=qr></div></div>
 <div class=card><b>الأسئلة</b> (سطر لكل سؤال: السؤال | خيار | خيار | خيار | رقم الإجابة الصحيحة)
@@ -85,6 +85,8 @@ var K=new URLSearchParams(location.search).get('key')||'',first=true;
 $('lk').textContent=location.origin+'/';$('sl').href='/screen';$('ex').href='/api/admin/csv?key='+encodeURIComponent(K);
 new QRCode($('qr'),{text:location.origin+'/',width:200,height:200});
 function act(a,b){fetch('/api/admin/'+a+'?key='+encodeURIComponent(K),{method:'POST',body:JSON.stringify(b||{})}).then(function(r){return r.json()}).then(function(d){$('msg').textContent=d.error||'';poll()})}
+var armed=false;
+function resetAll(){if(!armed){armed=true;$('msg').textContent='⚠️ اضغط تصفير مرة ثانية خلال 5 ثواني للتأكيد';setTimeout(function(){armed=false},5000);return}armed=false;fetch('/api/admin/reset?key='+encodeURIComponent(K),{method:'POST',body:'{}'}).then(function(r){return r.json()}).then(function(d){$('msg').textContent=d.error||'✅ تم التصفير';poll()}).catch(function(){$('msg').textContent='تعذر الاتصال بالسيرفر'})}
 function saveQ(){act('questions',{text:$('qt').value})}
 function poll(){fetch('/api/admin/state?key='+encodeURIComponent(K)).then(function(r){return r.json()}).then(function(s){
  if(s.error){document.body.innerHTML='<h1>مفتاح الإدارة غير صحيح</h1>';return}
