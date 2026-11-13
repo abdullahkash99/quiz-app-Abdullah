@@ -45,6 +45,7 @@ button.r{background:#dc2626}button.g{background:#16a34a}button.o{background:#d97
 #ov{position:fixed;inset:0;background:#0f172a;display:none;z-index:9;overflow:auto;padding:16px}table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid #334155;text-align:right}.ok{color:#4ade80}`;
 const QRJS = '<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>';
 const COMMON = String.raw`function $(i){return document.getElementById(i)}
+function pk(p,l){if(p.length<2)return p[0]||'...';var x;do{x=p[Math.floor(Math.random()*p.length)]}while(x==l);return x}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}`;
 const page = (body, js, qr) => `<!doctype html><html lang=ar dir=rtl><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>${TITLE}</title><style>${CSS}</style>${qr ? QRJS : ''}<body>${body}<script>${COMMON}\n${js}</script></body></html>`;
 
@@ -83,7 +84,9 @@ function render(s){ST=s;if(busy)return;
  if(s.status=='stopped'){set('<h1>⛔ انتهت المسابقة</h1><p class=big>عدد المشاركين: '+s.total+'</p>');return}
  set('<h1>🎉 ${TITLE}</h1><h2>امسح الرمز للمشاركة</h2><div id=qr></div><div class=win id=tm style="font-size:80px;margin:10px"></div><p class=big>'+(s.status=='open'?'المسابقة جارية — المشاركون: '+s.total:'ستبدأ المسابقة قريباً')+'</p>')}
 function spin(d){busy=true;last='';$('main').innerHTML='<h1>🎲 جارٍ السحب...</h1><h2>'+esc(d.cat||'')+'</h2><div class=win id=sp></div>';var t0=Date.now(),p=d.pool;
- (function tick(){var e=Date.now()-t0;if(e>6000){busy=false;last='';render(ST);return}$('sp').textContent=p[Math.floor(Math.random()*p.length)];setTimeout(tick,60+e/25)})()}
+ var n=0,lt='';(function tick(){var e=Date.now()-t0;if(e>2500)n++;var dl=n?50*Math.pow(1.18,n):50;
+  if(n&&dl>800){$('sp').textContent=d.winner;setTimeout(function(){busy=false;last='';render(ST)},1200);return}
+  lt=pk(p,lt);$('sp').textContent=lt;setTimeout(tick,dl)})()}
 function poll(){fetch('/api/state',{cache:'no-store'}).then(function(r){return r.json()})
 .then(function(s){off=s.now-Date.now();render(s)}).catch(function(){})}
 function fmt(r){var m=Math.floor(r/60),x=r%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x}
@@ -102,7 +105,7 @@ const ADMIN = page(`<div id=ov><div style="position:fixed;top:10px;right:10px;le
 <button class=o onclick="act('list')">📋 عرض/إخفاء قائمة المتأهلين</button><div style="margin:6px 0"><button id=d_mo onclick="drawNow('m','o')"></button><button id=d_mu onclick="drawNow('m','u')"></button><button id=d_fo onclick="drawNow('f','o')"></button><button id=d_fu onclick="drawNow('f','u')"></button></div>
 <button onclick="act('hide')">🖥 إخفاء الفائز</button><button class=o id=nr onclick="act('norepeat')"></button><button class=r onclick="resetAll()">♻ تصفير</button>
 <p id=msg class=er></p><p>📺 <a style="color:#93c5fd" id=sl target=_blank>افتح شاشة العرض</a> | <a style="color:#93c5fd" id=ex>تصدير CSV</a></p></div>
-<div class=card><b>🧪 اختبار النظام:</b> عدد المشاركين التجريبيين <input type=text id=cnt value=20 style="width:70px;display:inline-block"> <button class=o onclick="act('seed',{count:+$('cnt').value||20})">إضافة مشاركين تجريبيين</button><button class=r onclick="act('clearfake')">🧹 حذف التجريبيين</button></div>
+<div class=card><b>🧪 اختبار النظام:</b> عدد المشاركين التجريبيين <input type=text id=cnt value=40 style="width:70px;display:inline-block"> <button class=o onclick="act('seed',{count:+$('cnt').value||40})">إضافة مشاركين تجريبيين (موزعين على الفئات الأربع، نصفهم متأهل)</button><button class=r onclick="act('clearfake')">🧹 حذف التجريبيين</button></div>
 <div class=card><b>رابط المشاركة:</b> <span id=lk></span><div id=qr></div></div>
 <div class=card><b>الأسئلة</b> (سطر لكل سؤال: السؤال | خيار | خيار | خيار | رقم الإجابة الصحيحة)
 <textarea id=qt></textarea><button onclick=saveQ()>💾 حفظ الأسئلة</button></div>
@@ -132,11 +135,12 @@ function ovUpdate(s){QL=s.qual||[];if(spinning||ovLock||Date.now()-spinEnd<2500)
 var LG='',LA='',CL={mo:'ذكر — أكبر من 10 سنوات',mu:'ذكر — أقل من 10 سنوات',fo:'أنثى — أكبر من 10 سنوات',fu:'أنثى — أقل من 10 سنوات'};
 function drawNow(g,a){if(spinning)return;if(g){LG=g;LA=a}g=LG;a=LA;if(!g)return;spinning=true;ovLock=false;$('msg').textContent='';
  $('ov').style.display='block';$('ovc').innerHTML='<h1>🎲 جارٍ السحب...</h1><h2>'+CL[g+a]+'</h2><div class=win id=sp></div>';
- var t0=Date.now(),res=null,failed=false,fm='';
+ var t0=Date.now(),res=null,failed=false,fm='',n=0,lt='';
  (function tick(){if(!spinning)return;var e=Date.now()-t0,p=(res&&res.pool)||QL;
   if(failed){spinning=false;ovLock=true;$('ovc').innerHTML='<h1 class=er>'+esc(fm)+'</h1><div style="text-align:center"><button class=o onclick="act(\'resetwinners\');closeOv()">↺ أعد الفائزين السابقين للسحب</button></div>';return}
-  if(res&&e>6000){spinning=false;spinEnd=Date.now();$('ovc').innerHTML='<h1>🏆 الفائز</h1><h2>'+esc(res.cat||'')+'</h2><div class=win>'+esc(res.winner)+'</div>';poll();return}
-  $('sp').textContent=p.length?p[Math.floor(Math.random()*p.length)]:'...';setTimeout(tick,60+Math.min(e,6000)/25)})();
+  if(res&&e>2500)n++;var dl=n?50*Math.pow(1.18,n):50;
+  if(n&&dl>800){$('sp').textContent=res.winner;setTimeout(function(){spinning=false;spinEnd=Date.now();$('ovc').innerHTML='<h1>🏆 الفائز</h1><h2>'+esc(res.cat||'')+'</h2><div class=win>'+esc(res.winner)+'</div>';poll()},1200);return}
+  lt=pk(p,lt);$('sp').textContent=lt;setTimeout(tick,dl)})();
  fetch('/api/admin/draw?key='+encodeURIComponent(K),{method:'POST',body:JSON.stringify({gender:g,age:a})}).then(function(r){return r.json()}).then(function(d){if(d.error){failed=true;fm=d.error}else res=d.draw}).catch(function(){failed=true;fm='تعذر الاتصال'})}
 function spinAdmin(d){spinning=true;$('ov').style.display='block';$('ovc').innerHTML='<h1>🎲 جارٍ السحب...</h1><div class=win id=sp></div>';var t0=Date.now(),p=d.pool;
  (function tick(){if(!spinning)return;var e=Date.now()-t0;
@@ -202,8 +206,9 @@ http.createServer((req, res) => {
         for (let i = 0; i < n; i++) {
           const name = P(F) + ' ' + P(F) + ' ' + P(L);
           if (S.subs.some(x => norm(x.name) === norm(name))) continue;
-          const score = Math.random() < 0.4 ? th + R(T - th + 1) : R(th);
-          S.subs.push({ name, gender: P(['m', 'f']), age: P(['u', 'o']), score, total: T, at: Date.now(), fake: true });
+          const cat = [['m', 'o'], ['m', 'u'], ['f', 'o'], ['f', 'u']][i % 4], ok = Math.floor(i / 4) % 2 === 0;
+          const score = ok ? th + R(T - th + 1) : R(th);
+          S.subs.push({ name, gender: cat[0], age: cat[1], score, total: T, at: Date.now(), fake: true });
         }
       }
       else if (a === 'clearfake') { S.subs = S.subs.filter(x => !x.fake); S.winners = []; S.draw = null; S.showList = false; }
