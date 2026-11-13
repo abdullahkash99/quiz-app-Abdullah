@@ -204,9 +204,10 @@ http.createServer((req, res) => {
         const F = ['محمد','أحمد','خالد','عبدالله','سعد','فهد','سلطان','نواف','ماجد','يوسف','تركي','بندر','ناصر','عمر','فيصل','راشد'], L = ['العتيبي','الغامدي','القحطاني','الدوسري','الشمري','الحربي','الزهراني','المطيري','السبيعي','العنزي','الشهري','البلوي'];
         const n = Math.min(100, Math.max(1, +d.count || 20));
         for (let i = 0; i < n; i++) {
-          const name = P(F) + ' ' + P(F) + ' ' + P(L);
-          if (S.subs.some(x => norm(x.name) === norm(name))) continue;
           const cat = [['m', 'o'], ['m', 'u'], ['f', 'o'], ['f', 'u']][i % 4], ok = Math.floor(i / 4) % 2 === 0;
+          const FF = ['نورة','سارة','ريم','لمى','هند','منيرة','العنود','جواهر','شهد','ريماس','لولوة','غادة','أمل','هيفاء','دانة','مها'];
+          const name = (cat[0] === 'f' ? P(FF) : P(F)) + ' ' + P(F) + ' ' + P(L);
+          if (S.subs.some(x => norm(x.name) === norm(name))) continue;
           const score = ok ? th + R(T - th + 1) : R(th);
           S.subs.push({ name, gender: cat[0], age: cat[1], score, total: T, at: Date.now(), fake: true });
         }
