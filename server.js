@@ -38,7 +38,7 @@ const CSS = `*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;ma
 input[type=text],textarea{width:100%;padding:12px;border-radius:10px;border:1px solid #475569;background:#0f172a;color:#fff;font-size:16px}
 textarea{min-height:160px;font-family:inherit}label{display:block;padding:10px;margin:6px 0;background:#334155;border-radius:8px;cursor:pointer}
 button{background:#2563eb;color:#fff;border:0;border-radius:10px;padding:12px 18px;font-size:16px;margin:4px;cursor:pointer}
-button.r{background:#dc2626}button.g{background:#16a34a}button.o{background:#d97706}.er{color:#f87171;text-align:center}
+button.r{background:#dc2626}button.pk{background:#ec4899}.bl{background:#2563eb}.g{background:#16a34a}button.o{background:#d97706}.er{color:#f87171;text-align:center}
 .big{font-size:32px;text-align:center}.win{font-size:64px;text-align:center;color:#fbbf24;margin:30px;font-weight:bold}
 .grid{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}.chip{background:#334155;padding:10px 18px;border-radius:30px;font-size:22px}
 #qr{display:flex;justify-content:center;margin:20px;background:#fff;padding:14px;border-radius:12px;width:fit-content;margin-inline:auto}
@@ -79,11 +79,11 @@ function set(h){if(h==last)return;last=h;$('main').innerHTML=h;var q=$('qr');if(
 function wl(s){return s.winners.length?'<div class=card><b>الفائزون:</b> '+s.winners.map(esc).join(' • ')+'</div>':''}
 function render(s){ST=s;if(busy)return;
  if(s.draw&&s.draw.id!=seen){seen=s.draw.id;if(Date.now()-s.draw.id<20000){spin(s.draw);return}}
- if(s.draw){set('<h1>🏆 الفائز</h1><h2>'+esc(s.draw.cat||'')+'</h2><div class=win>'+esc(s.draw.winner)+'</div>'+wl(s));return}
+ if(s.draw){set('<h1>🏆 الفائز</h1><div class=win>'+esc(s.draw.winner)+'</div>'+wl(s));return}
  if(s.showList){var h='<h1>المتأهلون (80% فأعلى) — '+s.qualified.length+'</h1><div class=grid>';s.qualified.forEach(function(n){h+='<div class=chip>'+esc(n)+'</div>'});set(h+'</div>');return}
  if(s.status=='stopped'){set('<h1>⛔ انتهت المسابقة</h1><p class=big>عدد المشاركين: '+s.total+'</p>');return}
  set('<h1>🎉 ${TITLE}</h1><h2>امسح الرمز للمشاركة</h2><div id=qr></div><div class=win id=tm style="font-size:80px;margin:10px"></div><p class=big>'+(s.status=='open'?'المسابقة جارية — المشاركون: '+s.total:'ستبدأ المسابقة قريباً')+'</p>')}
-function spin(d){busy=true;last='';$('main').innerHTML='<h1>🎲 جارٍ السحب...</h1><h2>'+esc(d.cat||'')+'</h2><div class=win id=sp></div>';var t0=Date.now(),p=d.pool;
+function spin(d){busy=true;last='';$('main').innerHTML='<h1>🎲 جارٍ السحب...</h1><div class=win id=sp></div>';var t0=Date.now(),p=d.pool;
  var n=0,lt='';(function tick(){var e=Date.now()-t0;if(e>2500)n++;var dl=n?50*Math.pow(1.18,n):50;
   if(n&&dl>800){$('sp').textContent=d.winner;setTimeout(function(){busy=false;last='';render(ST)},1200);return}
   lt=pk(p,lt);$('sp').textContent=lt;setTimeout(tick,dl)})()}
@@ -98,11 +98,11 @@ poll();setInterval(poll,1500);
 
 const LOGIN = page(`<div class=card><h1>🔐 دخول الأدمن</h1><input type=password id=k placeholder="كلمة السر" style="width:100%;padding:12px;border-radius:10px;border:1px solid var(--mu);font-size:16px" onkeydown="if(event.key=='Enter')go()"><button onclick=go()>دخول</button><p id=er class=er></p></div>`, String.raw`
 function go(){fetch('/api/login',{method:'POST',body:JSON.stringify({key:$('k').value})}).then(function(r){return r.json()}).then(function(d){if(d.ok)location='/admin';else $('er').textContent=d.error})}`);
-const ADMIN = page(`<div id=ov><div style="position:fixed;top:10px;right:10px;left:10px;display:flex;justify-content:space-between"><button onclick="drawNow()">🎲 سحب آخر بنفس الفئة</button><button class=r onclick="closeOv()">✖ إغلاق</button></div><div id=ovc style="padding-top:70px"></div></div>
+const ADMIN = page(`<div id=ov><div style="position:fixed;top:10px;right:10px;left:10px;display:flex;justify-content:space-between"><button onclick="drawNow()">🎲 سحب آخر</button><button class=r onclick="closeOv()">✖ إغلاق</button></div><div id=ovc style="padding-top:70px"></div></div>
 <h1>لوحة التحكم — ${TITLE}</h1><p id=wk class=er></p>
 <div class=card><p>الحالة: <b id=st></b> | المشاركون: <b id=tot></b> | المتأهلون (80%+): <b id=qc></b></p>
 المدة بالدقائق: <input type=text id=mins value=10 style="width:70px;display:inline-block"> <button class=g onclick="act('start',{minutes:+$('mins').value||10})">▶ بدء المسابقة</button><button class=r onclick="act('stop')">⏹ إيقاف المسابقة</button>
-<button class=o onclick="act('list')">📋 عرض/إخفاء قائمة المتأهلين</button><div style="margin:6px 0"><button id=d_mo onclick="drawNow('m','o')"></button><button id=d_mu onclick="drawNow('m','u')"></button><button id=d_fo onclick="drawNow('f','o')"></button><button id=d_fu onclick="drawNow('f','u')"></button></div>
+<button class=o onclick="act('list')">📋 عرض/إخفاء قائمة المتأهلين</button><div style="margin:6px 0"><button class=bl id=d_mo onclick="drawNow('m','o')"></button><button class=bl id=d_mu onclick="drawNow('m','u')"></button><button class=pk id=d_fo onclick="drawNow('f','o')"></button><button class=pk id=d_fu onclick="drawNow('f','u')"></button></div>
 <button onclick="act('hide')">🖥 إخفاء الفائز</button><button class=o id=nr onclick="act('norepeat')"></button><button class=r onclick="resetAll()">♻ تصفير</button>
 <p id=msg class=er></p><p>📺 <a style="color:#93c5fd" id=sl target=_blank>افتح شاشة العرض</a> | <a style="color:#93c5fd" id=ex>تصدير CSV</a></p></div>
 <div class=card><b>🧪 اختبار النظام:</b> عدد المشاركين التجريبيين <input type=text id=cnt value=40 style="width:70px;display:inline-block"> <button class=o onclick="act('seed',{count:+$('cnt').value||40})">إضافة مشاركين تجريبيين (موزعين على الفئات الأربع، نصفهم متأهل)</button><button class=r onclick="act('clearfake')">🧹 حذف التجريبيين</button></div>
@@ -125,21 +125,21 @@ function poll(){fetch('/api/admin/state?key='+encodeURIComponent(K)).then(functi
  if(first){first=false;$('qt').value=s.qtext}
  var h='<tr><th>الاسم</th><th>الجنس</th><th>الفئة</th><th>الدرجة</th><th>النسبة</th></tr>';
  s.subs.slice().sort(function(a,b){return b.score-a.score}).forEach(function(x){var p=Math.round(100*x.score/x.total);h+='<tr><td>'+esc(x.name)+(x.fake?' 🧪':'')+(s.winners.indexOf(x.name)>=0?' 🏆':'')+'</td><td>'+({m:'ذكر',f:'أنثى'}[x.gender]||'')+'</td><td>'+({u:'أقل من 10',o:'أكبر من 10'}[x.age]||'')+'</td><td>'+x.score+'/'+x.total+'</td><td class='+(p>=80?'ok':'')+'>'+p+'%</td></tr>'});
- $('tb').innerHTML=h;['mo','mu','fo','fu'].forEach(function(k){$('d_'+k).textContent='🎲 '+CL[k]+' ('+((s.qc||{})[k[0]+'_'+k[1]]||0)+')'});$('wk').textContent=s.weak?'⚠️ كلمة سر الأدمن ضعيفة: غيّر ADMIN_KEY في Render إلى 10 أحرف أو أكثر':'';$('nr').textContent=s.noRepeat?'🔒 منع تكرار الفائز: مفعّل':'🔓 منع تكرار الفائز: معطّل';$('sc').textContent=s.draw?('🏆 الفائز: '+s.draw.winner):(s.showList?'📋 قائمة المتأهلين':'— لا شيء —');$('ql').innerHTML='<small>المتأهلون الآن ('+s.qual.length+'):</small> '+(s.qual.length?s.qual.map(esc).join(' • '):'لا أحد حتى الآن (يلزم 80% فأعلى)');ovUpdate(s)})}
+ $('tb').innerHTML=h;['mo','mu','fo','fu'].forEach(function(k){$('d_'+k).textContent='🎲 '+(k[1]=='o'?'أكبر من 10 سنوات':'أقل من 10 سنوات')+' ('+((s.qc||{})[k[0]+'_'+k[1]]||0)+')'});$('wk').textContent=s.weak?'⚠️ كلمة سر الأدمن ضعيفة: غيّر ADMIN_KEY في Render إلى 10 أحرف أو أكثر':'';$('nr').textContent=s.noRepeat?'🔒 منع تكرار الفائز: مفعّل':'🔓 منع تكرار الفائز: معطّل';$('sc').textContent=s.draw?('🏆 الفائز: '+s.draw.winner):(s.showList?'📋 قائمة المتأهلين':'— لا شيء —');$('ql').innerHTML='<small>المتأهلون الآن ('+s.qual.length+'):</small> '+(s.qual.length?s.qual.map(esc).join(' • '):'لا أحد حتى الآن (يلزم 80% فأعلى)');ovUpdate(s)})}
 var spinning=false,spinEnd=0,QL=[],ovLock=false;
 function closeOv(){spinning=false;ovLock=false;$('ov').style.display='none';fetch('/api/admin/hide?key='+encodeURIComponent(K),{method:'POST',body:'{}'}).then(poll)}
 function ovUpdate(s){QL=s.qual||[];if(spinning||ovLock||Date.now()-spinEnd<2500)return;var o=$('ov'),c=$('ovc');
- if(s.draw){c.innerHTML='<h1>🏆 الفائز</h1><h2>'+esc(s.draw.cat||'')+'</h2><div class=win>'+esc(s.draw.winner)+'</div>';o.style.display='block'}
+ if(s.draw){c.innerHTML='<h1>🏆 الفائز</h1><div class=win>'+esc(s.draw.winner)+'</div>';o.style.display='block'}
  else if(s.showList){var h='<h1>المتأهلون (80% فأعلى) — '+s.qual.length+'</h1><div class=grid>';s.qual.forEach(function(n){h+='<div class=chip>'+esc(n)+'</div>'});c.innerHTML=h+'</div>';o.style.display='block'}
  else o.style.display='none'}
-var LG='',LA='',CL={mo:'ذكر — أكبر من 10 سنوات',mu:'ذكر — أقل من 10 سنوات',fo:'أنثى — أكبر من 10 سنوات',fu:'أنثى — أقل من 10 سنوات'};
+var LG='',LA='';
 function drawNow(g,a){if(spinning)return;if(g){LG=g;LA=a}g=LG;a=LA;if(!g)return;spinning=true;ovLock=false;$('msg').textContent='';
- $('ov').style.display='block';$('ovc').innerHTML='<h1>🎲 جارٍ السحب...</h1><h2>'+CL[g+a]+'</h2><div class=win id=sp></div>';
+ $('ov').style.display='block';$('ovc').innerHTML='<h1>🎲 جارٍ السحب...</h1><div class=win id=sp></div>';
  var t0=Date.now(),res=null,failed=false,fm='',n=0,lt='';
  (function tick(){if(!spinning)return;var e=Date.now()-t0,p=(res&&res.pool)||QL;
   if(failed){spinning=false;ovLock=true;$('ovc').innerHTML='<h1 class=er>'+esc(fm)+'</h1><div style="text-align:center"><button class=o onclick="act(\'resetwinners\');closeOv()">↺ أعد الفائزين السابقين للسحب</button></div>';return}
   if(res&&e>2500)n++;var dl=n?50*Math.pow(1.18,n):50;
-  if(n&&dl>800){$('sp').textContent=res.winner;setTimeout(function(){spinning=false;spinEnd=Date.now();$('ovc').innerHTML='<h1>🏆 الفائز</h1><h2>'+esc(res.cat||'')+'</h2><div class=win>'+esc(res.winner)+'</div>';poll()},1200);return}
+  if(n&&dl>800){$('sp').textContent=res.winner;setTimeout(function(){spinning=false;spinEnd=Date.now();$('ovc').innerHTML='<h1>🏆 الفائز</h1><div class=win>'+esc(res.winner)+'</div>';poll()},1200);return}
   lt=pk(p,lt);$('sp').textContent=lt;setTimeout(tick,dl)})();
  fetch('/api/admin/draw?key='+encodeURIComponent(K),{method:'POST',body:JSON.stringify({gender:g,age:a})}).then(function(r){return r.json()}).then(function(d){if(d.error){failed=true;fm=d.error}else res=d.draw}).catch(function(){failed=true;fm='تعذر الاتصال'})}
 function spinAdmin(d){spinning=true;$('ov').style.display='block';$('ovc').innerHTML='<h1>🎲 جارٍ السحب...</h1><div class=win id=sp></div>';var t0=Date.now(),p=d.pool;
@@ -224,7 +224,7 @@ http.createServer((req, res) => {
         if (!G[d.gender] || !A[d.age]) return J({ error: 'اختر فئة السحب' });
         const cat = G[d.gender] + ' — ' + A[d.age];
         const pool = qualified().filter(s => s.gender === d.gender && s.age === d.age).map(s => s.name).filter(n => !S.noRepeat || !S.winners.includes(n));
-        if (!pool.length) return J({ error: 'لا يوجد متأهلون متبقون في فئة: ' + cat });
+        if (!pool.length) return J({ error: 'لا يوجد متأهلون متبقون للسحب' });
         const winner = pool[crypto.randomInt(pool.length)];
         if (!S.winners.includes(winner)) S.winners.push(winner); S.showList = false; S.draw = { id: Date.now(), winner, pool, cat };
       }
