@@ -4,9 +4,9 @@ const PORT = process.env.PORT || 3000, KEY = process.env.ADMIN_KEY || 'admin123'
 const DEFQ = `ما أول مسجد بُني في الإسلام؟ | المسجد النبوي | قباء | المسجد الحرام | المسجد الأقصى | 2
 كم كان عمر الرسول ﷺ عندما نزل عليه الوحي؟ | 25 عاماً | 33 عاماً | 40 عاماً | 50 عاماً | 3
 ما أكبر قارة في العالم؟ | آسيا | أفريقيا | أمريكا الشمالية | أوروبا | 1
-أم أحمد لديها أربعة أبناء: شمال وجنوب وشرق، فما اسم الابن الرابع؟ | غرب | أحمد | وسط | محمد | 2
-ما هو الشيء الذي إذا أكلته كله تستفيد، وإذا أكلت نصفه تموت؟ | السمسم | العسل | التمر | الزيتون | 1
-لديك 5 تفاحات وأخذت منها 3، كم تفاحة معك؟ | 2 | 5 | 3 | 8 | 3
+# أم أحمد لديها أربعة أبناء: شمال وجنوب وشرق، فما اسم الابن الرابع؟ | أحمد / ابنها أحمد / اسمه أحمد / الابن الرابع أحمد
+# ما هو الشيء الذي إذا أكلته كله تستفيد، وإذا أكلت نصفه تموت؟ | السمسم / سمسم
+# لديك 5 تفاحات وأخذت منها 3، كم تفاحة معك؟ | 3 / 3 تفاحات / 3 تفاحة / ثلاث / ثلاث تفاحات
 ما عاصمة المملكة العربية السعودية؟ | جدة | الرياض | مكة المكرمة | الدمام | 2
 في أي عام تأسست المملكة العربية السعودية بمسماها الحالي؟ | 1927 | 1902 | 1953 | 1932 | 4
 ما أصغر دولة في العالم من حيث المساحة؟ | موناكو | سان مارينو | الفاتيكان | ليختنشتاين | 3
@@ -14,8 +14,17 @@ const DEFQ = `ما أول مسجد بُني في الإسلام؟ | المسجد
 let S = { status: 'idle', round: 1, qtext: DEFQ, questions: [], subs: [], winners: [], draw: null, showList: false, minutes: 10, endsAt: 0, stoppedAt: 0, noRepeat: false };
 try { Object.assign(S, JSON.parse(fs.readFileSync(FILE, 'utf8'))); } catch (e) {}
 const save = () => fs.writeFileSync(FILE, JSON.stringify(S));
-const parseQ = t => t.split('\n').map(l => l.split('|').map(x => x.trim())).filter(a => a.length >= 4 && a[0])
-  .map(a => ({ q: a[0], o: a.slice(1, -1), c: (+a[a.length - 1]) - 1 })).filter(q => q.c >= 0 && q.c < q.o.length);
+const parseQ = t => t.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+  if (l[0] === '#') { const a = l.slice(1).split('|').map(x => x.trim()), ans = (a[1] || '').split('/').map(x => x.trim()).filter(Boolean); return a[0] && ans.length ? { q: a[0], t: true, ans } : null; }
+  const a = l.split('|').map(x => x.trim()); if (a.length < 4 || !a[0]) return null;
+  const o = a.slice(1, -1), c = (+a[a.length - 1]) - 1; return c >= 0 && c < o.length ? { q: a[0], o, c } : null;
+}).filter(Boolean);
+const NW = { واحد: '1', اثنين: '2', اثنان: '2', ثلاث: '3', ثلاثه: '3', اربع: '4', اربعه: '4', خمس: '5', خمسه: '5', ست: '6', سته: '6', سبع: '7', سبعه: '7', ثمان: '8', ثمانيه: '8', تسع: '9', تسعه: '9', عشر: '10', عشره: '10' };
+const nz = s => String(s).toLowerCase().replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+  .replace(/[\u064B-\u065F\u0670\u0640]/g, '').replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي')
+  .replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean)
+  .map(w => NW[w] || (w.startsWith('ال') && w.length > 3 ? w.slice(2) : w)).filter(w => w !== 'ال').join('');
+const okText = (q, v) => typeof v === 'string' && v.length <= 100 && nz(v) !== '' && q.ans.some(a => nz(a) === nz(v));
 if (!S.questions.length) S.questions = parseQ(S.qtext);
 const sha = x => crypto.createHash('sha256').update(String(x)).digest();
 const eq = (a, b) => crypto.timingSafeEqual(sha(a), sha(b));
@@ -66,9 +75,9 @@ document.addEventListener('visibilitychange',function(){if(nm&&!loaded)poll()});
 function load(){fetch('/api/questions',{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){
  if(d.error){loaded=false;t=setInterval(poll,2000);return}
  qs=d.qs;round=d.round;endsAt=d.endsAt;off=d.now-Date.now();var h='<div id=tm class=card style="text-align:center;font-size:24px;position:sticky;top:0;z-index:2"></div><h2>'+esc(nm)+'</h2>';
- qs.forEach(function(q,i){h+='<div class=card><b>'+(i+1)+'. '+esc(q.q)+'</b>';q.o.forEach(function(o,j){h+='<label><input type=radio name=q'+i+' value='+j+'> '+esc(o)+'</label>'});h+='</div>'});
+ qs.forEach(function(q,i){h+='<div class=card><b>'+(i+1)+'. '+esc(q.q)+'</b>';if(q.t)h+='<input type=text id=t'+i+' maxlength=100 autocomplete=off placeholder="اكتب إجابتك هنا">';else q.o.forEach(function(o,j){h+='<label><input type=radio name=q'+i+' value='+j+'> '+esc(o)+'</label>'});h+='</div>'});
  h+='<div class=card><button onclick=send()>إرسال الإجابات</button><p id=er2 class=er></p></div>';$('s3').innerHTML=h;show('s3')})}
-function send(){var a=[];for(var i=0;i<qs.length;i++){var c=document.querySelector('input[name=q'+i+']:checked');if(!c){$('er2').textContent='أجب على جميع الأسئلة';return}a.push(+c.value)}
+function send(){var a=[];for(var i=0;i<qs.length;i++){if(qs[i].t){var v=$('t'+i).value.trim();if(!v){$('er2').textContent='أجب على جميع الأسئلة';return}a.push(v);continue}var c=document.querySelector('input[name=q'+i+']:checked');if(!c){$('er2').textContent='أجب على جميع الأسئلة';return}a.push(+c.value)}
  fetch('/api/submit',{method:'POST',body:JSON.stringify({name:nm,gender:gd,age:ag,answers:a})}).then(function(r){return r.json()}).then(function(d){
   if(d.ok){show('s2');$('msg').textContent='✅ تم استلام إجاباتك، شكراً لمشاركتك'}else if(d.error.indexOf('الاسم')>=0){nm='';loaded=false;clearInterval(t);show('s1');$('er').textContent=d.error}else $('er2').textContent=d.error})}
 `);
@@ -107,7 +116,7 @@ const ADMIN = page(`<div id=ov><div style="position:fixed;top:10px;right:10px;le
 <p id=msg class=er></p><p>📺 <a style="color:#93c5fd" id=sl target=_blank>افتح شاشة العرض</a> | <a style="color:#93c5fd" id=ex>تصدير CSV</a></p></div>
 <div class=card><b>🧪 اختبار النظام:</b> عدد المشاركين التجريبيين <input type=text id=cnt value=40 style="width:70px;display:inline-block"> <button class=o onclick="act('seed',{count:+$('cnt').value||40})">إضافة مشاركين تجريبيين (موزعين على الفئات الأربع، نصفهم متأهل)</button><button class=r onclick="act('clearfake')">🧹 حذف التجريبيين</button></div>
 <div class=card><b>رابط المشاركة:</b> <span id=lk></span><div id=qr></div></div>
-<div class=card><b>الأسئلة</b> (سطر لكل سؤال: السؤال | خيار | خيار | خيار | رقم الإجابة الصحيحة)
+<div class=card><b>الأسئلة</b> (سطر لكل سؤال: السؤال | خيار | خيار | خيار | رقم الإجابة الصحيحة). للسؤال الكتابي: # السؤال | إجابة / إجابة أخرى)
 <textarea id=qt></textarea><button onclick=saveQ()>💾 حفظ الأسئلة</button></div>
 <div class=card><b>ما يظهر الآن على شاشة العرض:</b> <span id=sc></span><div id=ql style="margin-top:8px"></div></div>
 <div class=card><b>النتائج</b><table id=tb></table></div>`, String.raw`
@@ -174,7 +183,7 @@ http.createServer((req, res) => {
     if (p === '/api/state') return J({ now: Date.now(), minutes: S.minutes, endsAt: S.endsAt, status: S.status, round: S.round, total: S.subs.length, draw: S.draw, winners: S.winners,
       showList: S.showList, qualified: S.showList ? qualified().map(s => s.name) : [] });
     if (p === '/api/questions') return S.status !== 'open' ? J({ error: 'closed' })
-      : J({ now: Date.now(), endsAt: S.endsAt, round: S.round, qs: S.questions.map(q => ({ q: q.q, o: q.o })) });
+      : J({ now: Date.now(), endsAt: S.endsAt, round: S.round, qs: S.questions.map(q => q.t ? { q: q.q, t: 1 } : { q: q.q, o: q.o }) });
     if (p === '/api/submit' && req.method === 'POST') {
       if (S.status !== 'open') return J({ error: 'المسابقة غير مفتوحة' });
       const name = String(d.name || '').trim().replace(/\s+/g, ' ');
@@ -183,9 +192,9 @@ http.createServer((req, res) => {
       if (name.length > 60) return J({ error: 'الاسم طويل جداً' });
       if (S.subs.length >= 3000) return J({ error: 'اكتمل العدد' });
       if (!Array.isArray(d.answers) || d.answers.length !== S.questions.length) return J({ error: 'إجابات غير مكتملة' });
-      if (d.answers.some((x, i) => !Number.isInteger(x) || x < 0 || x >= S.questions[i].o.length)) return J({ error: 'إجابات غير صالحة' });
+      if (d.answers.some((x, i) => S.questions[i].t ? (typeof x !== 'string' || !x.trim() || x.length > 100) : (!Number.isInteger(x) || x < 0 || x >= S.questions[i].o.length))) return J({ error: 'إجابات غير صالحة' });
       if (S.subs.some(s => norm(s.name) === norm(name))) return J({ error: 'هذا الاسم شارك مسبقاً' });
-      const score = S.questions.filter((q, i) => d.answers[i] === q.c).length;
+      const score = S.questions.filter((q, i) => q.t ? okText(q, d.answers[i]) : d.answers[i] === q.c).length;
       S.subs.push({ name, gender: d.gender, age: d.age, score, total: S.questions.length, at: Date.now() }); save();
       return J({ ok: true });
     }
