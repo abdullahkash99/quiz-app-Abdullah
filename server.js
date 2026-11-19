@@ -58,25 +58,35 @@ function pk(p,l){if(p.length<2)return p[0]||'...';var x;do{x=p[Math.floor(Math.r
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}`;
 const page = (body, js, qr) => `<!doctype html><html lang=ar dir=rtl><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>${TITLE}</title><style>${CSS}</style>${qr ? QRJS : ''}<body>${body}<script>${COMMON}\n${js}</script></body></html>`;
 
-const USER = page(`<div class=card id=s1><h1>🎉 ${TITLE}</h1><p>اكتب اسمك الثلاثي</p><input type=text id=nm placeholder="الاسم الثلاثي">
+const USER = page(`<style>body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}input{-webkit-user-select:text;user-select:text}@media print{body{display:none!important}}</style><div class=card id=s1><h1>🎉 ${TITLE}</h1><p>اكتب اسمك الثلاثي</p><input type=text id=nm placeholder="الاسم الثلاثي">
 <p>الجنس</p><label><input type=radio name=gd value=m> ذكر</label><label><input type=radio name=gd value=f> أنثى</label>
 <p>الفئة العمرية</p><label><input type=radio name=ag value=u> أقل من 10 سنوات</label><label><input type=radio name=ag value=o> أكبر من 10 سنوات</label>
 <button onclick=go()>دخول</button><p id=er class=er></p></div>
 <div class=card id=s2 hidden><p class=big id=msg></p></div><div id=s3 hidden></div>`, String.raw`
-var gd='',ag='',nm,qs=[],round,loaded=false,t,endsAt=0,off=0;
+var wmEl=null,gd='',ag='',nm,qs=[],round,loaded=false,t,endsAt=0,off=0;
 function fmt(r){var m=Math.floor(r/60),x=r%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x}
 setInterval(function(){var e=$('tm');if(e&&endsAt){var r=Math.max(0,Math.ceil((endsAt-(Date.now()+off))/1000));e.textContent='⏱ الوقت المتبقي '+fmt(r);e.style.color=r<=60?'#ef4444':''}},500);
-function show(i){['s1','s2','s3'].forEach(function(x){$(x).hidden=x!=i})}
+function show(i){['s1','s2','s3'].forEach(function(x){$(x).hidden=x!=i});if(wmEl)wmEl.style.display=i=='s3'?'block':'none'}
 function go(){var v=$('nm').value.trim().replace(/\s+/g,' ');if(v.split(' ').length<3){$('er').textContent='الرجاء كتابة الاسم الثلاثي كاملاً';return}var g=document.querySelector('input[name=gd]:checked'),a=document.querySelector('input[name=ag]:checked');if(!g||!a){$('er').textContent='اختر الجنس والفئة العمرية';return}nm=v;gd=g.value;ag=a.value;poll();clearInterval(t);t=setInterval(poll,2000)}
 function poll(){fetch('/api/state',{cache:'no-store'}).then(function(r){return r.json()}).then(function(s){
   if(s.status=='open'){if(!loaded){loaded=true;clearInterval(t);load()}}
  else{show('s2');$('msg').textContent=s.status=='idle'?'⏳ المسابقة لم تبدأ بعد، ابقَ في هذه الصفحة':'⛔ انتهت المسابقة'}}).catch(function(){if(nm){show('s2');$('msg').textContent='📶 جارٍ الاتصال... تأكد من الإنترنت'}})}
 document.addEventListener('visibilitychange',function(){if(nm&&!loaded)poll()});window.addEventListener('online',function(){if(nm&&!loaded)poll()});
+function wm(n){var svg='<svg xmlns="http://www.w3.org/2000/svg" width="280" height="170"><text x="10" y="95" transform="rotate(-25 140 85)" font-size="18" fill="rgba(128,128,128,0.25)" font-family="Tahoma,Arial">'+esc(n)+'</text></svg>';
+ var d=document.createElement('div');d.style.cssText='position:fixed;top:0;right:0;bottom:0;left:0;pointer-events:none;z-index:50;background-image:url("data:image/svg+xml;utf8,'+encodeURIComponent(svg)+'")';document.body.appendChild(d);return d}
+['contextmenu','copy','cut','dragstart'].forEach(function(e){document.addEventListener(e,function(ev){ev.preventDefault()})});
+function isIn(t){return t&&/^(INPUT|TEXTAREA)$/.test(t.tagName||'')}
+document.addEventListener('selectstart',function(ev){if(!isIn(ev.target)&&!isIn(ev.target.parentNode))ev.preventDefault()});
+document.addEventListener('keydown',function(ev){var k=(ev.key||'').toLowerCase();if((ev.ctrlKey||ev.metaKey)&&k.length==1&&'cxsup'.indexOf(k)>=0)ev.preventDefault()});
+document.addEventListener('keyup',function(ev){if(ev.key=='PrintScreen'){try{navigator.clipboard.writeText(' ')}catch(e){}}});
+function cover(on){var e=$('s3');if(e)e.style.filter=on?'blur(18px)':''}
+document.addEventListener('visibilitychange',function(){cover(document.hidden)});
+window.addEventListener('blur',function(){cover(true)});window.addEventListener('focus',function(){cover(false)});
 function load(){fetch('/api/questions',{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){
  if(d.error){loaded=false;t=setInterval(poll,2000);return}
  qs=d.qs;round=d.round;endsAt=d.endsAt;off=d.now-Date.now();var h='<div id=tm class=card style="text-align:center;font-size:24px;position:sticky;top:0;z-index:2"></div><h2>'+esc(nm)+'</h2>';
  qs.forEach(function(q,i){h+='<div class=card><b>'+(i+1)+'. '+esc(q.q)+'</b>';if(q.t)h+='<input type=text id=t'+i+' maxlength=100 autocomplete=off placeholder="اكتب إجابتك هنا">';else q.o.forEach(function(o,j){h+='<label><input type=radio name=q'+i+' value='+j+'> '+esc(o)+'</label>'});h+='</div>'});
- h+='<div class=card><button onclick=send()>إرسال الإجابات</button><p id=er2 class=er></p></div>';$('s3').innerHTML=h;show('s3')})}
+ h+='<div class=card><button onclick=send()>إرسال الإجابات</button><p id=er2 class=er></p></div>';$('s3').innerHTML=h;show('s3');if(wmEl)wmEl.remove();wmEl=wm(nm)})}
 function send(){var a=[];for(var i=0;i<qs.length;i++){if(qs[i].t){var v=$('t'+i).value.trim();if(!v){$('er2').textContent='أجب على جميع الأسئلة';return}a.push(v);continue}var c=document.querySelector('input[name=q'+i+']:checked');if(!c){$('er2').textContent='أجب على جميع الأسئلة';return}a.push(+c.value)}
  fetch('/api/submit',{method:'POST',body:JSON.stringify({name:nm,gender:gd,age:ag,answers:a})}).then(function(r){return r.json()}).then(function(d){
   if(d.ok){show('s2');$('msg').textContent='✅ تم استلام إجاباتك، شكراً لمشاركتك'}else if(d.error.indexOf('الاسم')>=0){nm='';loaded=false;clearInterval(t);show('s1');$('er').textContent=d.error}else $('er2').textContent=d.error})}
